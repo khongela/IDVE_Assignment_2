@@ -1,0 +1,295 @@
+\documentclass{article}
+
+\usepackage[final]{../NeurIPS-Dataset-Styles/neurips_data_2024/neurips_data_2024}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{placeins}
+
+\title{Temporal Patterns in New York City Taxi Trips:\\
+Data Cleaning, Feature Generation and Exploration}
+
+\author{%
+  Msesenyane Makhongela \\
+  School of Computer Science and Applied Mathematics \\
+  University of the Witwatersrand \\
+  Johannesburg, South Africa
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This report explores temporal patterns in the New York City Taxi Trip Duration
+training sample. The data contain 1,458,644 trips recorded between January and
+June 2016. Implausible durations, distances, speeds, coordinates and passenger
+counts were removed before analysis. The cleaning process retained 1,443,535
+trips, or 98.96\% of the original sample. Friday had the highest average daily
+trip count. Weekday demand was concentrated around the evening commute, while
+weekend activity shifted towards late-night hours. Memorial Day produced the
+largest holiday reduction, whereas Valentine's Day was busier than a typical
+Sunday. Average trip speed was highest at 05:00 and lowest during the congested
+daytime period.
+\end{abstract}
+
+\section{Introduction}
+
+The New York City Taxi Trip Duration dataset contains pickup and drop-off
+times, coordinates, passenger counts and trip durations for trips recorded
+between 1 January and 30 June 2016 \cite{nyctaxi}. This report addresses three
+tasks. First, it identifies and removes implausible observations. Second, it
+generates distance, day-of-week and average-speed features. Third, it uses the
+cleaned data to examine daily, hourly, weekday, weekend and holiday patterns.
+
+All temporal results use pickup time. Trip counts refer to the Kaggle training
+sample rather than every taxi trip completed in New York City. They are
+therefore treated as a consistent measure of activity within the sample.
+
+\section{Data cleaning}
+
+The dataset contained 1,458,644 rows and no missing values. However, several
+values were not plausible. The maximum recorded duration was approximately
+40.8 days, the maximum straight-line distance was 1,240.9 km, and the maximum
+implied average speed was 9,274.8 km/h. Some coordinates were also far outside
+New York City, while 65 trips had passenger counts outside the valid range of
+one to six.
+
+Distance was calculated using the Haversine formula:
+
+\begin{equation}
+  d = 2R\arcsin\left(\sqrt{
+  \sin^2\left(\frac{\Delta\phi}{2}\right) +
+  \cos(\phi_1)\cos(\phi_2)
+  \sin^2\left(\frac{\Delta\lambda}{2}\right)}\right),
+\end{equation}
+
+where $R=6371.0088$ km, $\phi$ is latitude and $\lambda$ is longitude. This
+gives straight-line distance rather than road distance, but it is sufficient
+for detecting major coordinate and speed errors.
+
+Table~\ref{tab:cleaning} summarises the cleaning rules. The limits were kept
+broad so that unusual but credible trips remained in the sample. A duration
+below 30 seconds is unlikely to represent a completed passenger trip, while a
+duration above four hours is more likely to indicate a timestamp or meter
+error. Distances below 50 metres make speed unreliable, and distances above
+100 km are extreme for this setting. An average speed above 120 km/h is not
+credible for a taxi travelling through New York. The coordinate boundary
+includes Manhattan, JFK, LaGuardia and Newark while excluding distant points.
+
+\begin{table}[H]
+  \caption{Cleaning rules and the number of trips flagged}
+  \label{tab:cleaning}
+  \centering
+  \small
+  \begin{tabular}{lr}
+    \toprule
+    Criterion & Trips flagged \\
+    \midrule
+    Duration outside 30 seconds to 4 hours & 6,859 \\
+    Distance outside 0.05 to 100 km & 11,348 \\
+    Average speed above 120 km/h & 136 \\
+    Pickup or drop-off outside the NYC metro box & 998 \\
+    Passenger count outside 1 to 6 & 65 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The rules overlap, so their individual counts cannot be added. A trip was
+removed if it failed at least one rule. In total, 15,109 trips were removed,
+leaving 1,443,535 trips. This is a reduction of only 1.04\%, so the later
+patterns are not produced by aggressive trimming. Figure~\ref{fig:cleaning}
+shows the raw distributions and the selected boundaries.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figures/cleaning_diagnostics.png}
+  \caption{Raw duration, straight-line distance and average-speed
+  distributions. The horizontal axes are logarithmic and dashed lines show
+  the cleaning boundaries.}
+  \label{fig:cleaning}
+\end{figure}
+
+\section{Feature generation}
+
+Three required features were generated. Trip distance was calculated in
+kilometres using the Haversine formula. Day of week was extracted from pickup
+time and stored as an ordered category from Monday to Sunday. Average speed was
+calculated as
+
+\begin{equation}
+  \text{average speed (km/h)} =
+  \frac{\text{distance (km)}}{\text{trip duration (seconds)} / 3600}.
+\end{equation}
+
+Pickup date, hour, weekday number and a weekday/weekend indicator were also
+created. These additional fields allowed each temporal comparison to be
+performed directly and kept the weekday order consistent across tables and
+figures.
+
+\section{Time-based analysis}
+
+\subsection{Most popular day of the week}
+
+Friday was the most popular day, with an average of 8,507.5 trips per day.
+Saturday was close behind with 8,406.9 trips. The six-month period contains 26
+occurrences of every weekday, so total counts and average daily counts produce
+the same ranking. The average is reported because it is easier to interpret
+and remains appropriate for periods with unequal weekday frequencies.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.88\linewidth]{figures/weekday_popularity.png}
+  \caption{Average number of trips by pickup day. Friday recorded the highest
+  daily average, followed by Saturday.}
+  \label{fig:weekday}
+\end{figure}
+
+\subsection{Most popular hour on each day}
+
+Figure~\ref{fig:heatmap} shows the share of each weekday's trips occurring in
+each hour. Monday and Tuesday peaked at 18:00, Wednesday at 19:00, Thursday at
+21:00, Friday at 19:00, Saturday at 23:00 and Sunday at 00:00.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figures/weekday_hour_heatmap.png}
+  \caption{Hourly pickup distribution for each day of the week. Colour shows
+  the percentage of that weekday's trips occurring in each hour.}
+  \label{fig:heatmap}
+\end{figure}
+
+The Monday-to-Wednesday peaks are consistent with evening commuting and
+after-work activity. Thursday and Friday remain busy later, while the Saturday
+and Sunday midnight peaks are consistent with nightlife trips crossing into
+the early morning. These are plausible explanations rather than confirmed trip
+purposes because the dataset does not record why each passenger travelled.
+
+\subsection{Weekdays and weekends}
+
+Figure~\ref{fig:daytype} compares average hourly counts per day. Weekdays show
+clear morning and evening commuter patterns. Weekend activity begins later in
+the morning and is stronger between 22:00 and 01:00. Despite these different
+shapes, the average daily volumes are almost identical: 7,936.7 trips on a
+weekday and 7,918.5 on a weekend day.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\linewidth]{figures/weekday_weekend.png}
+  \caption{Average hourly pickup patterns on weekdays and weekends. Daily
+  averaging prevents the five weekdays from outweighing the two weekend days.}
+  \label{fig:daytype}
+\end{figure}
+
+Weekend trips were slightly longer in distance and faster on average. The
+median weekend distance was 2.22 km compared with 2.07 km on weekdays, while
+the mean speed was 15.84 km/h compared with 13.92 km/h. Lighter traffic and a
+different mix of destinations may explain these differences. However, the
+median weekend duration was slightly shorter, at 10.37 minutes compared with
+11.38 minutes on weekdays.
+
+\subsection{Major holidays}
+
+The analysis used the correct 2016 dates: Martin Luther King Jr. Day on 18
+January, Valentine's Day on 14 February, St. Patrick's Day on 17 March, Easter
+Sunday on 27 March and Memorial Day on 30 May. Each holiday was compared with
+the median hourly profile of the same weekday, excluding the five named
+holidays. Matching by weekday separates the holiday effect from normal weekly
+variation.
+
+\begin{table}[H]
+  \caption{Holiday trips compared with a typical matching weekday}
+  \label{tab:holidays}
+  \centering
+  \small
+  \begin{tabular}{lrrrr}
+    \toprule
+    Holiday & Trips & Typical & Change & Peak hour \\
+    \midrule
+    Martin Luther King Jr. Day & 7,060 & 7,166.5 & $-1.5\%$ & 18:00 \\
+    Valentine's Day & 8,393 & 7,556.0 & $+11.1\%$ & 17:00 \\
+    St. Patrick's Day & 8,167 & 8,324.0 & $-1.9\%$ & 20:00 \\
+    Easter Sunday & 7,290 & 7,556.0 & $-3.5\%$ & 00:00 \\
+    Memorial Day & 5,513 & 7,166.5 & $-23.1\%$ & 16:00 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Memorial Day produced the largest change. It had 23.1\% fewer trips than a
+typical Monday, and its peak moved from the usual 18:00 to 16:00. This is
+consistent with the removal of the normal weekday commute. Valentine's Day had
+11.1\% more trips than a typical Sunday and peaked at 17:00 rather than
+midnight, which may reflect additional early-evening social travel. Easter was
+3.5\% quieter than a typical Sunday. Martin Luther King Jr. Day and St.
+Patrick's Day had daily totals close to their comparison days, although their
+hourly shapes still changed.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/holiday_profiles.png}
+  \caption{Hourly holiday profiles compared with the median profile of the
+  same weekday. Holiday effects differ in both total volume and timing.}
+  \label{fig:holidays}
+\end{figure}
+
+\subsection{Average speed throughout the day}
+
+Figure~\ref{fig:speed} shows the mean and median trip speed by pickup hour.
+Trips were fastest at 05:00, when the mean speed was 24.58 km/h and the median
+was 22.84 km/h. Speed fell sharply from 06:00 as morning activity increased and
+remained low through the working day. The lowest mean occurred at 15:00, at
+12.14 km/h. Speed then increased after 19:00.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\linewidth]{figures/speed_by_hour.png}
+  \caption{Mean and median average speed by pickup hour. Both measures show the
+  same daily pattern.}
+  \label{fig:speed}
+\end{figure}
+
+The agreement between the mean and median suggests that the pattern is not
+caused only by a small number of unusually fast trips. Traffic congestion is
+the most likely explanation, although route mix and trip distance may also
+change during the day.
+
+\section{Limitations}
+
+The Haversine distance measures straight-line displacement and therefore
+underestimates the road distance travelled. The training data are a sample of
+recorded trips rather than a complete measure of taxi demand. The dataset also
+does not contain journey purpose, traffic conditions or road routes. The
+suggested explanations for commuting, nightlife and holiday activity are
+therefore interpretations of the observed patterns, not causal conclusions.
+Finally, each named holiday is represented by only one date in the six-month
+period, so its result should not be generalised to every year.
+
+\section{Conclusion}
+
+The cleaning process removed 1.04\% of records and retained 1,443,535 plausible
+trips. Friday had the highest average daily activity. Weekday demand was shaped
+by commuting, while weekend demand shifted towards late-night travel. Memorial
+Day showed the largest reduction relative to its normal weekday, whereas
+Valentine's Day was busier than a typical Sunday. Trip speeds were highest in
+the early morning and lowest during the congested daytime period. Together,
+the results show that both trip volume and travel speed follow clear weekly and
+hourly patterns.
+
+\section*{References}
+
+\small
+
+\begin{thebibliography}{1}
+\bibitem{nyctaxi}
+Kaggle. \emph{New York City Taxi Trip Duration}.
+\url{https://www.kaggle.com/c/nyc-taxi-trip-duration}.
+\end{thebibliography}
+
+\end{document}
