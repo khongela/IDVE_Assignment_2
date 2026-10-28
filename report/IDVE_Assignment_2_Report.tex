@@ -286,32 +286,31 @@ hourly patterns.
 
 \subsection{Sampled-trip feature matrix}
 
-A simple random sample of exactly 20,000 cleaned trips is drawn without
-replacement using seed 42. Every cleaned row has equal selection probability;
-the seed makes the draw reproducible for the same data and row order. Original
-row indices and trip identifiers are retained for traceability, but identifiers
-are not included as features. The full cleaned dataset remains available for
-the temporal analysis.
+A random sample of exactly 20,000 cleaned trips is drawn without replacement
+using seed 42. Each cleaned trip has the same chance of being selected. Original row indices and trip IDs are kept so each trip can be traced
+back to the data, but IDs are not used as features. The full cleaned dataset
+is still available for the time-based analysis.
 
 The matrix contains 11 numeric features: pickup and drop-off longitude and
 latitude (four columns), Haversine distance in kilometres, duration in minutes,
 average speed in km/h, and two cyclic columns each for pickup hour and weekday.
-Coordinates describe origins, destinations and direction; distance, duration
-and speed describe trip length, time cost and movement intensity. Hour and
-weekday capture daily and weekly travel patterns. Distance is straight-line
-displacement rather than driven distance, and speed inherits this limitation.
-Speed is derived from distance and duration, so the three features are
-dependent and can give trip magnitude additional weight.
+Coordinates describe where trips start and end, and their direction.
+Distance, duration and speed describe how far, how long and how fast trips
+are. Hour and weekday capture daily and weekly travel patterns. Distance is
+measured in a straight line, not along roads, so the speed estimate has the
+same limitation. Speed is calculated from distance and duration. These three
+features are therefore related and can give trip length and movement extra
+weight in the analysis.
 
 For pickup hour $h\in\{0,\ldots,23\}$, the encoding is
 \begin{equation}
   h_{\sin}=\sin(2\pi h/24), \qquad h_{\cos}=\cos(2\pi h/24).
 \end{equation}
-Weekday is encoded analogously with period seven and Monday equal to zero.
-This keeps midnight adjacent to 23:00 and Monday adjacent to Sunday, unlike
-raw integer encodings. Both sine and cosine are needed to distinguish positions
-around the cycle. Raw hour and weekday are retained for interpretation but
-not duplicated in the matrix.
+Weekday uses the same encoding with a cycle of seven and Monday equal to zero.
+This keeps midnight close to 23:00 and Monday close to Sunday, unlike using
+the raw integers. Both sine and cosine are needed to tell positions around
+the cycle apart. Raw hour and weekday are kept for interpretation but are
+not added again to the matrix.
 
 All 11 columns are standardized using \texttt{StandardScaler}, fitted on the
 20,000 sampled rows:
@@ -320,31 +319,31 @@ All 11 columns are standardized using \texttt{StandardScaler}, fitted on the
   \qquad
   \sigma_j^2=\frac{1}{20000}\sum_{i=1}^{20000}(x_{ij}-\mu_j)^2.
 \end{equation}
-This gives each column zero mean and unit population variance, preventing
-different measurement units from dominating distance-based methods.
+This gives each column a mean of zero and a population variance of one,
+so different measurement units do not dominate distance-based methods.
 Standardization does not remove skew or outliers; implausible extremes were
-handled during cleaning. Scaling sine and cosine separately preserves
-continuity but may stretch the circle into an ellipse. This chooses equal
-column variance, not equal weight per feature group, and standardized
-coordinates are not exact geographical distances.
+handled during cleaning. Scaling sine and cosine separately keeps the cycle
+continuous but may stretch its circle into an ellipse. Each column has equal
+variance, but groups of features do not necessarily have equal weight.
+Distances between standardized coordinates are not exact geographic distances.
 
 The notebook retains the encoded matrix as \texttt{X\_unscaled}, the
 $20{,}000\times11$ standardized matrix as \texttt{X\_scaled}, and the fitted
-scaler for reuse. Checks verify shape, finite values, unique sampled row
-indices, row alignment, zero means and unit variances. These are descriptive
-features for completed trips: duration and derived speed would cause target
-leakage when predicting duration. Any later train/test analysis must fit its
-scaler on training rows only.
+scaler for reuse. Checks confirm the matrix shape, finite values, unique row
+indices, matching row order, zero means and unit variances. These features
+describe completed trips. Using duration or speed derived from duration to
+predict duration would leak the target into the inputs. Any later train/test
+analysis must fit its scaler on training rows only.
 
 \subsection{Principal component analysis}
 
-PCA was fitted by full singular value decomposition to the standardized
+PCA was fitted using full singular value decomposition to the standardized
 $20{,}000\times11$ feature matrix, without drawing a new sample. The scree plot
 in Figure~\ref{fig:pca-scree} shows individual and cumulative explained
-variance. PC1 explains 23.56\% and PC2 explains 14.11\%, together accounting for
+variance. PC1 explains 23.56\% and PC2 explains 14.11\%, giving
 37.68\%. Eight components explain 89.63\%, below the required threshold;
 \textbf{nine components are needed to explain at least 90\%}, retaining
-94.58\%. The two-dimensional projection therefore omits most of the variance.
+94.58\%. The two-dimensional plot therefore leaves out most of the variance.
 
 \begin{figure}[H]
   \centering
@@ -356,14 +355,14 @@ variance. PC1 explains 23.56\% and PC2 explains 14.11\%, together accounting for
 
 All 20,000 trips are shown on the first two components in
 Figure~\ref{fig:pca-projections}, coloured by pickup hour, weekday/weekend and
-Haversine distance. Metadata are aligned using the original sampled row
-indices. Hour uses a cyclic colour map. Distance uses a logarithmic colour
-scale for readability, not a logarithmic transformation of the PCA input.
+Haversine distance. Colour values are matched to trips using the original
+sampled row indices. Hour uses a cyclic colour map. Distance uses a logarithmic
+colour scale to make the range easier to read; the PCA input is not log-transformed.
 Distance increases clearly from left to right, including the extended
-right-hand branch. Pickup-hour colours are intermingled, while weekdays and
-weekends substantially overlap in both the central cloud and the branch.
-These plots do not establish discrete clusters or an absence of temporal
-structure in the remaining components.
+right-hand branch. Pickup-hour colours are mixed, while weekdays and
+weekends overlap strongly in both the central cloud and the branch.
+These plots do not prove that there are separate clusters, or that time
+patterns are absent from the remaining components.
 
 \begin{figure}[H]
   \centering
@@ -374,9 +373,9 @@ structure in the remaining components.
 \end{figure}
 
 Figure~\ref{fig:pca-loadings} gives the signed component coefficients, here
-called loadings. These are the weights in the linear combination of centered,
-standardized inputs, not feature-score correlations. A component's entire sign
-may be reversed without changing the PCA solution.
+called loadings. They are the weights used to combine the centered,
+standardized features, not correlations between features and component scores.
+Reversing all signs in a component does not change the PCA solution.
 
 \begin{figure}[H]
   \centering
@@ -385,37 +384,38 @@ may be reversed without changing the PCA solution.
   \label{fig:pca-loadings}
 \end{figure}
 
-\textbf{PC1 represents trip magnitude with a geographic contrast.}
+\textbf{PC1 mainly represents trip length, duration and speed, with a location effect.}
 The strongest coefficients are distance ($+0.588$), duration ($+0.459$),
 pickup longitude ($+0.396$), speed ($+0.355$) and drop-off longitude ($+0.284$).
 Higher scores tend to describe longer-distance, longer-duration and faster
-trips, with more easterly endpoints. Negative latitude weights add a southerly
-contrast. This is not a pure distance axis; the dependence of speed on
-distance and duration also gives trip magnitude extra influence.
+trips, with pickup and drop-off points farther east. Negative latitude weights
+also link higher scores to points farther south. This is not a distance-only
+axis. Because speed depends on distance and duration, these related features
+have a combined influence.
 
 \textbf{PC2 is primarily a north-east versus south-west location axis.}
 Drop-off latitude ($+0.629$), pickup latitude ($+0.550$), drop-off longitude
-($+0.402$) and pickup longitude ($+0.210$) dominate. Higher scores generally
-indicate more northerly/easterly endpoints. Speed ($+0.234$) and duration
-($-0.131$) add a secondary faster/shorter-duration contrast, whereas distance
+($+0.402$) and pickup longitude ($+0.210$) have the largest weights. Higher
+scores generally indicate pickup and drop-off points farther north and east.
+Speed ($+0.234$) and duration ($-0.131$) also link higher scores to faster,
+shorter-duration trips, while distance
 has almost no direct weight ($-0.0015$). Hour and weekday coefficients are
-small on both components, consistent with the mixed temporal colours. These
-are descriptive linear associations, not causal effects or confirmed trip
-purposes.
+small on both components, matching the mixed time-based colours. These
+describe linear relationships, not causes or confirmed reasons for travel.
 
 \subsection{t-SNE and perplexity}
 
 Three two-dimensional t-SNE embeddings were fitted to the same standardized
 $20{,}000\times11$ matrix, at perplexities 5, 30 and 100. No further sampling or
-two-component PCA truncation was used. All other settings were fixed:
+reduction to two PCA components was used. All other settings were fixed:
 Euclidean distance, PCA initialization, seed 42, automatic learning rate
 (416.67 for this sample), early exaggeration 12, 1,000 maximum iterations,
 and Barnes--Hut approximation with angle 0.5. Computation was limited to two
-threads. All runs reached the iteration budget; convergence or stability
-across different seeds is not established.
+threads. All runs used the full iteration budget. This does not show that
+they converged or that results are stable across different seeds.
 
-Perplexity controls the effective neighbourhood size in the input-space
-similarities, not the number of clusters. Figure~\ref{fig:tsne} compares the
+Perplexity controls how many nearby points influence the input similarities,
+not the number of clusters. Figure~\ref{fig:tsne} compares the
 embeddings using the same hour and distance colour scales. Each row repeats
 one embedding, coloured by pickup hour, weekday/weekend and distance.
 The distance colour scale is logarithmic for readability; the input distance
@@ -430,48 +430,48 @@ feature was standardized without a log transform.
   \label{fig:tsne}
 \end{figure}
 
-\textbf{Perplexity 5} produces a roughly disk-shaped map with tiny filaments
-and local patches, and fewer clear gaps between broad regions. Hour varies
+\textbf{Perplexity 5} produces a roughly disk-shaped map with thin strands
+and small patches, with fewer clear gaps between broad regions. Hour varies
 locally and weekend trips concentrate in a right-hand region, but the fine
 texture makes broad neighbourhoods harder to read.
 
-\textbf{Perplexity 30} produces more distinct lobes and gaps, with locally
-coherent hour bands. Weekend trips occupy prominent right-hand lobes,
+\textbf{Perplexity 30} produces clearer lobes and gaps, with nearby points
+showing similar hour colours. Weekend trips occupy clear right-hand lobes,
 whereas weekday trips dominate the left and upper/lower regions. Longer
 trips concentrate in a small separated right-hand branch, although distance
 also varies within the main map.
 
-\textbf{Perplexity 100} preserves broadly similar colour associations and
+\textbf{Perplexity 100} keeps broadly similar colour patterns and
 the long-distance side branch, while producing more compact lobes with less
-fine filamentary texture. Larger perplexity therefore changes the granularity
+fine strand-like detail. Larger perplexity therefore changes the level of detail
 and layout; in these data it makes broad lobes clearer rather than simply
 merging everything into one cloud. Perplexity 30 offers a useful middle-scale
-view, but these plots do not establish an optimal setting.
+view, but these plots do not prove that it is the best setting.
 
-Only local associations should be interpreted. t-SNE axes have no feature
+Interpret nearby relationships with care. t-SNE axes have no feature
 loadings or explained-variance meaning, and the ordering, areas and distances
-between separated islands are not reliable measures of original-space
-structure. Apparent islands do not establish real clusters. Hour, weekday
-and distance are already input features, so colour coherence is not independent
-validation of discovered trip classes. Final KL divergences are optimization
-diagnostics within runs, not comparable model-selection scores across
-perplexities because each perplexity changes the target similarities.
+between separate islands do not reliably describe the original feature space.
+An island is not proof of a real cluster. Hour, weekday and distance are
+already input features, so similar colours do not independently confirm trip
+classes. Final KL divergence shows how well each run fits its target
+similarities. It cannot be used directly to choose between perplexities,
+because each perplexity changes those target similarities.
 
 \subsection{UMAP: neighbourhood size and minimum distance}
 
 UMAP was fitted to the same standardized $20{,}000\times11$ matrix for all
 six combinations of \texttt{n\_neighbors} equal to 5, 15 and 50 and
 \texttt{min\_dist} equal to 0.0 and 0.5. No additional sampling or
-two-component PCA truncation was used. Euclidean distance, spectral
+reduction to two PCA components was used. Euclidean distance, spectral
 initialization, spread 1.0, 500 optimization epochs and seed 42 were fixed.
 Seeded optimization used one worker; numerical thread pools were limited to
 two threads. The implementation uses the \texttt{umap-learn} package.
 
-\texttt{n\_neighbors} determines the input-space neighbourhood graph:
-small values emphasize very local structure, while larger values use
-broader connectivity. \texttt{min\_dist} controls how tightly points can
-pack in the embedding, not a hard minimum distance or an input-space
-distance threshold. Figures~\ref{fig:umap-zero} and~\ref{fig:umap-half}
+\texttt{n\_neighbors} controls the graph linking nearby input points:
+small values focus on very local structure, while larger values include
+broader connections. \texttt{min\_dist} controls how tightly points can
+pack in the plot. It is not a strict minimum distance or a threshold on
+distances in the input data. Figures~\ref{fig:umap-zero} and~\ref{fig:umap-half}
 hold minimum distance fixed and vary neighbourhood size by row. All panels
 use the same colour scales and all 20,000 trips, with labels added after
 fitting. Distance uses a log colour scale only.
@@ -493,14 +493,14 @@ fitting. Distance uses a log colour scale only.
 \end{figure}
 
 \textbf{Effect of neighbourhood size.} With 5 neighbours, several compact
-islands and small satellites are visible at minimum distance 0.0; at 0.5
-the islands expand into broader lobes but fragmentation remains.
+islands and small outlying groups are visible at minimum distance 0.0; at 0.5
+the islands expand into broader lobes but remain partly separated.
 With 15 neighbours, the 0.0 map still has separate islands, whereas
 the 0.5 map connects main lobes around a central region, with readable
-within-lobe hour gradients. With 50 neighbours, broader connectivity
-reduces some fragmentation: at 0.0 some lobes join but islands persist,
+hour changes within each lobe. With 50 neighbours, broader connections
+reduce some separation: at 0.0 some lobes join but islands remain,
 while at 0.5 the main body is much more connected. Small long-distance
-satellites remain. Increasing neighbourhood size therefore does not
+outlying groups remain. Increasing neighbourhood size therefore does not
 simply force all observations into one group.
 
 \textbf{Effect of minimum distance.} Holding neighbourhood size fixed,
@@ -509,38 +509,38 @@ At 0.5, lobes occupy more area, gaps narrow and bridges become more visible,
 particularly with 15 or 50 neighbours. This changes visual compactness
 rather than the number of input neighbours.
 
-\textbf{Colour patterns and interpretation.} Pickup-hour gradients and
-weekday/weekend-dominated regions recur across all six runs. Longer trips
-are concentrated in small branches or satellites and transitions near the
-main body; distance is more mixed within the major temporal lobes.
-Changing parameters rearranges and reshapes these regions. Since time
-and distance are input features, the colours are not independent validation
-of trip classes. Fifteen neighbours with minimum distance 0.5 provides a
-useful middle-scale view, but appearance does not establish an optimal
-setting. Axes have no loadings or explained-variance interpretation;
-island spacing, area and apparent density are not exact original-space
-geometry. Apparent islands do not establish real clusters or trip purposes.
-A fixed seed and 500 epochs do not establish convergence or stability
-across seeds or library versions.
+\textbf{Colour patterns and interpretation.} Gradual changes in pickup hour
+and regions dominated by weekdays or weekends appear in all six runs.
+Longer trips concentrate in small branches, outlying groups and areas
+near the main body. Distance is more mixed within the large time-based lobes.
+Changing parameters moves and reshapes these regions. Since time and distance
+are input features, their colours do not independently confirm trip classes.
+Fifteen neighbours with minimum distance 0.5 gives a useful middle-scale
+view, but appearance alone does not prove that it is the best setting.
+The axes have no loadings or explained-variance meaning. Island spacing,
+area and apparent density do not exactly represent the original feature
+space. Islands are not proof of real clusters or reasons for travel.
+A fixed seed and 500 epochs do not show convergence or stability across
+seeds or library versions.
 
 \subsection{Density-based clustering in the reduced spaces}
 
 HDBSCAN from \texttt{sklearn.cluster} was fitted in three spaces: all nine
 PCA components needed to explain at least 90\% variance, the selected
 perplexity-30 t-SNE embedding, and UMAP with 15 neighbours and minimum
-distance 0.5. The latter two settings were selected for middle-scale
-readability, not optimized for cluster counts. Reduced coordinates were
-not whitened or independently rescaled. PCA labels are displayed on PC1
+distance 0.5. The t-SNE and UMAP settings were chosen for readable
+middle-scale views, not to obtain particular cluster counts. Reduced
+coordinates were not whitened or rescaled separately. PCA labels are shown on PC1
 and PC2 only, although clustering uses nine dimensions.
 
-The minimum cluster size was 200 (1\% of the sample), excluding tiny groups
-from substantive interpretation. The density requirement was
+The minimum cluster size was 200 (1\% of the sample), so tiny groups were
+not treated as main trip classes. The density requirement was
 \texttt{min\_samples=20}, just above twice the largest dimension, nine.
 Euclidean distance, excess-of-mass hierarchy selection, no additional
 epsilon merging, and \texttt{allow\_single\_cluster=False} were used.
-Unlike DBSCAN, HDBSCAN selects persistent groups over a hierarchy of
-distance scales, so one epsilon or a k-distance elbow is not required.
-These settings are exploratory rather than estimates of true trip classes.
+Unlike DBSCAN, HDBSCAN selects groups that persist across a hierarchy of
+distance scales, so it does not need one epsilon or a k-distance elbow.
+These settings help explore the data; they do not estimate the true trip classes.
 
 \begin{table}[H]
   \caption{HDBSCAN results for the same 20,000 sampled trips. Noise is excluded
@@ -562,7 +562,7 @@ These settings are exploratory rather than estimates of true trip classes.
   \includegraphics[width=\linewidth]{figures/clustering_projections.png}
   \caption{HDBSCAN labels in the three reduced spaces. PCA is clustered in
   nine dimensions and displayed on the first two. Grey points are noise;
-  numeric labels are local to each space.}
+  cluster numbers apply only within each space.}
   \label{fig:cluster-projections}
 \end{figure}
 
@@ -571,18 +571,18 @@ These settings are exploratory rather than estimates of true trip classes.
 Minimum cluster sizes 100, 200 and 400 were compared at
 \texttt{min\_samples=20}; density settings 10, 20 and 40 were compared at
 cluster size 200. The notebook also reports adjusted Rand indices against
-the chosen partition, including noise. At cluster size 200, PCA yields
+the chosen clustering, including noise. At cluster size 200, PCA gives
 9, 3 and 2 clusters for density settings 10, 20 and 40, with noise
-23.445\%, 8.680\% and 1.910\%. PCA therefore has no strongly stable unique
-partition under this check. t-SNE retains three clusters across these
+23.445\%, 8.680\% and 1.910\%. The PCA clustering is therefore not stable
+across these settings. t-SNE keeps three clusters across these
 density settings (0.285--0.515\% noise), and UMAP retains two (0.265\% noise).
-At cluster size 400, the smaller JFK groups are no longer eligible:
+At cluster size 400, the smaller JFK groups are too small to be selected:
 PCA produces seven clusters and 36.810\% noise, t-SNE produces two and
 2.105\% noise, and UMAP produces eight and 11.470\% noise.
-Changing eligibility can reorganize the selected hierarchy, so counts and
-noise need not vary monotonically. A high adjusted Rand index may be
-dominated by the large shared urban group and does not guarantee stable
-small airport groups.
+Changing which groups meet the size limit can change the selected hierarchy.
+Cluster counts and noise therefore need not always rise or fall together.
+A high adjusted Rand index may mainly reflect the large shared urban group,
+rather than stable small airport groups.
 
 \begin{figure}[H]
   \centering
@@ -595,12 +595,12 @@ small airport groups.
 \subsubsection{Original-feature profiles and descriptive names}
 
 Profiles use unscaled trip records, with duration in minutes, Haversine
-distance in kilometres and implied speed in km/h. Both median and modal
-hour are reported because a linear hour median can be misleading across
+distance in kilometres and implied speed in km/h. Both the median and most
+frequent (modal) hour are reported because a linear hour median can mislead across
 midnight. Short means median distance below 3 km, medium-distance means
 3 to below 12 km, and long-distance means at least 12 km. Weekday-heavy
-means at least 65\% weekdays, not enrichment relative to a sample that
-already contains more weekdays. No six-hour time band contains half of
+means at least 65\% weekdays. It does not mean more weekdays than expected
+from the sample, which already contains more weekdays. No six-hour time band contains half of
 any selected cluster, so all are described as mixed-hour.
 
 \begin{table}[H]
@@ -644,20 +644,20 @@ weekday-heavy and mixed-hour.
   \item \textbf{t-SNE 1: short urban trips.}
   This broad group covers the main urban pickup corridor.
   \item \textbf{t-SNE 2: medium-distance LaGuardia-area pickups.}
-  74.44\% are near LaGuardia; the map is more diffuse than PCA cluster 2.
+  74.44\% are near LaGuardia; pickups are more spread out than in PCA cluster 2.
   \item \textbf{UMAP 0: short urban trips.}
   This broad group also absorbs LaGuardia-area trips.
   \item \textbf{UMAP 1: long-distance JFK-area pickups.}
   96.42\% are near JFK.
 \end{itemize}
 
-Airport proximity is calculated by Haversine distance to approximate
-reference points; an airport-area name requires at least 50\% of pickups
-within 2 km. It is not proof of terminal use or passenger purpose.
+Airport proximity is measured using Haversine distance to approximate
+reference points. An airport-area name requires at least 50\% of pickups
+within 2 km. This does not prove terminal use or the reason for travel.
 Figures~\ref{fig:cluster-pca-map}--\ref{fig:cluster-umap-map} plot every
 cluster's pickup locations separately, including noise for comparison.
-These are offline longitude/latitude maps with common extents and a local
-latitude aspect correction, not street or route maps. Reference landmarks
+These are offline longitude/latitude maps with the same geographic limits
+and an aspect ratio adjusted for local latitude, not street or route maps. Reference landmarks
 provide context and grey background points show all sampled pickups.
 
 \begin{figure}[H]
@@ -681,13 +681,194 @@ provide context and grey background points show all sampled pickups.
   \label{fig:cluster-umap-map}
 \end{figure}
 
-Clustering t-SNE or UMAP finds density in distorted two-dimensional spaces,
-not original-feature density. Their low noise fractions do not demonstrate
-better clustering. The large urban groups contain many trip types, and
-visual temporal lobes need not be separate excess-of-mass clusters.
-Noise means unassigned under the chosen settings, not invalid observations.
-These results are exploratory and depend on feature weights, sample,
+Clustering t-SNE or UMAP measures density in a changed two-dimensional space,
+not in the original features. Their low noise fractions do not prove better
+clustering. The large urban groups contain many trip types, and visible
+time-based lobes are not necessarily separate excess-of-mass clusters.
+Noise means unassigned under these settings, not invalid data.
+These are exploratory results. They depend on feature weights, the sample,
 embedding settings and density parameters, especially for PCA.
+
+\subsection{Comparison of PCA, t-SNE and UMAP}
+
+Figure~\ref{fig:embedding-comparison} places the selected views side by side
+with identical logarithmic distance colouring: PC1/PC2, t-SNE perplexity 30,
+and UMAP with 15 neighbours and minimum distance 0.5. Every panel contains
+the same 20,000 trips. Each method has its own coordinates and scale.
+PCA clustering still uses nine components, not just the two displayed.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figures/embedding_comparison.png}
+  \caption{Selected two-dimensional views with a common trip-distance colour
+  scale. The log transform affects colour only.}
+  \label{fig:embedding-comparison}
+\end{figure}
+
+\subsubsection{Consistent groups and the linear versus nonlinear views}
+
+A large group of short urban trips and a group of long-distance JFK-area
+pickups appear across all three methods. All 264 members of the PCA JFK group also
+belong to the nonlinear JFK groups; the t-SNE and UMAP groups contain 364
+and 363 trips, with 363 in common. Their approximately 20 km median
+distances and original pickup-location maps support this description,
+although proximity does not prove the reason for travel.
+Not all airport groups remain separate: PCA and t-SNE identify
+LaGuardia-area groups with 295 and 763 members (294 in common), whereas
+UMAP includes these trips in its broad urban group. Group boundaries
+therefore depend on the method.
+
+PCA shows gradual changes in distance, duration and speed, plus a geographic
+second axis. Its feature coefficients can be interpreted directly.
+The 2D display retains only 37.68\% of variance, so overlapping points can
+hide differences along later components. The nine components used for
+clustering retain 94.58\%. Nonlinear views show lobes with similar hour and
+weekday values that PCA's linear 2D view largely misses. However, the
+selected HDBSCAN hierarchy does not treat every visible lobe as a separate cluster.
+
+\subsubsection{Local and global structure}
+
+Local structure was measured using mean 15-neighbour recall: the fraction
+of each trip's original 15 nearest neighbours that remain neighbours after
+reduction. This was averaged over 2,000 fixed random query trips, with
+neighbours found among all 20,000 trips and the query itself excluded.
+A rough measure of global structure was the Spearman correlation of distances
+for the same 10,000 random pairs of distinct trips. Both checks use the
+original standardized 11D space as a reference. They do not independently
+validate groups or measure whether density is preserved.
+
+\begin{table}[H]
+  \caption{Observed structure preservation. PCA 9D is the clustering
+  representation, not a fourth 2D plot.}
+  \centering
+  \begin{tabular}{lrr}
+    \toprule
+    Space & Mean 15-neighbour recall & Pair-distance Spearman \\
+    \midrule
+    PCA 2D & 0.0255 & 0.7486 \\
+    t-SNE 2D & 0.5125 & 0.3120 \\
+    UMAP 2D & 0.2345 & 0.3582 \\
+    PCA 9D & 0.7877 & 0.9891 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+t-SNE best preserves immediate neighbours among the 2D views in this
+experiment. UMAP does better than PCA 2D locally, but not better than t-SNE.
+PCA best keeps the broad ordering of distances, particularly in 9D.
+UMAP's pair-distance correlation is slightly higher than t-SNE's, but both
+are low. This does not show that either gives accurate global geometry.
+
+PCA uses orthogonal axes, so distances in the retained components cannot
+exceed distances in the original standardized features. However, dropping
+components can make distances much smaller. PCA does not minimize the
+distance error for every pair. t-SNE optimizes local similarity probabilities,
+while UMAP optimizes a fuzzy neighbourhood graph. Neither nonlinear map has
+axes in physical-distance units or PCA-style feature loadings.
+Gaps between islands, their order, area and apparent density do not reliably
+describe the original feature space. Even PCA's plot area shows projected
+spread, not the number of trips. Cluster sizes must be read from membership
+counts, not visual area. None of these distances is a road distance.
+
+\subsubsection{Runtime and sensitivity}
+
+Repeat fits at seeds 42 and 43 were timed after earlier runs had warmed up
+the software. Timings cover only
+\texttt{fit\_transform}, excluding imports, preprocessing, clustering and
+plotting. Numerical thread pools were limited to two, with one UMAP
+optimization worker. All other settings matched the selected runs.
+
+\begin{table}[H]
+  \caption{Warm fit times and seed-to-seed cluster agreement. PCA uses full
+  SVD; its seed is irrelevant. UMAP compilation overhead is excluded.}
+  \centering
+  \begin{tabular}{lrrr}
+    \toprule
+    Method & Seed 42 time (s) & Seed 43 time (s) & Cluster ARI \\
+    \midrule
+    PCA & 0.0043 & 0.0044 & 1.0000 \\
+    t-SNE & 91.39 & 94.23 & 1.0000 \\
+    UMAP & 16.60 & 16.44 & 1.0000 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+PCA is by far the fastest, and UMAP is about 5.5 times faster than t-SNE here.
+Exact timings depend on hardware, software, system load, thread limits,
+iteration budgets and first-use overhead. Full-SVD PCA gives repeatable
+results but depends on feature scaling and the number of retained dimensions.
+t-SNE depends on perplexity,
+initialization, learning rate, iteration budget and seed. UMAP depends on
+neighbourhood size, minimum distance, initialization, epochs and seed.
+Earlier parameter tests visibly changed both nonlinear layouts and how
+tightly their points were packed. All selected clusterings were identical
+between seeds 42 and 43 and matched their earlier seed-42 labels.
+This shows stable cluster assignments for those two runs only. It does not
+show identical coordinates, stable neighbourhoods, convergence or stability
+across other seeds.
+
+\subsubsection{Cluster agreement and validity}
+
+Adjusted Rand index (ARI) measures cluster agreement while adjusting for
+chance. Changing cluster numbers does not affect it. ARI equals one for
+identical clusterings, is near zero for chance-level agreement and can be
+negative. Table~\ref{tab:ari-comparison} reports ARI for all trips, treating
+-1 as a shared noise label, and for trips assigned to a non-noise cluster
+by both methods. The second measure uses a different set of trips and
+leaves out difficult cases.
+
+\begin{table}[H]
+  \caption{Pairwise cluster agreement. Noise handling is explicit.}
+  \label{tab:ari-comparison}
+  \centering
+  \begin{tabular}{lrrr}
+    \toprule
+    Pair & ARI, all trips & Both assigned & ARI, shared assigned subset \\
+    \midrule
+    PCA--t-SNE & 0.6188 & 18,264 & 0.9905 \\
+    PCA--UMAP & 0.2678 & 18,264 & 0.6311 \\
+    t-SNE--UMAP & 0.5005 & 19,943 & 0.4686 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.65\linewidth]{figures/clustering_ari_comparison.png}
+  \caption{ARI on all 20,000 trips, including noise.}
+  \label{fig:ari-comparison}
+\end{figure}
+
+PCA and t-SNE agree most strongly overall. Of the 1,736 PCA noise trips,
+t-SNE assigns 1,119 to its urban group, 460 to its LaGuardia group and
+100 to its JFK group, leaving 57 as noise. Excluding unassigned cases
+therefore increases their ARI sharply. UMAP merges all 763 t-SNE
+LaGuardia-group trips into its urban group, despite recovering almost
+the same JFK group. The notebook cross-tabulations show these differences.
+A large shared urban group can hide disagreement about smaller groups.
+
+Nonlinear clusters should be treated as possible groups, not confirmed trip
+classes. t-SNE and UMAP change density, and HDBSCAN finds dense groups in
+those changed spaces. Clear islands, low noise or agreement between methods
+or seeds are not enough to confirm real groups. Original-unit profiles,
+pickup maps and the JFK group found in nine-dimensional PCA give stronger
+support. However, all methods use the same features and may share biases.
+Further checks would need the full standardized feature space, new samples,
+more seeds and density settings, and independent geographic or operational
+evidence. This analysis does not claim independent validation.
+
+\subsubsection{Recommendation}
+
+Use \textbf{UMAP with 15 neighbours and minimum distance 0.5 as the primary
+exploratory 2D map, paired with PCA as an interpretable reference}.
+UMAP is much faster than t-SNE here, shows local time patterns and finds
+the recurring JFK group without the tight packing caused by minimum
+distance 0.0. Check apparent nonlinear groups against nine-dimensional
+PCA and original-feature profiles and maps, rather than treating UMAP
+density as ground truth. If keeping immediate neighbours is the main
+priority, use t-SNE instead: it gave the best 2D neighbour recall in this
+experiment. For broad geometry, feature interpretation or a repeatable
+baseline, prefer PCA, but do not rely only on its two-dimensional display.
 
 \section*{References}
 
